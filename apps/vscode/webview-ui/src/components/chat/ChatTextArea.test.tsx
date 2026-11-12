@@ -42,6 +42,7 @@ vi.mock("@/services/grpc-client", () => ({
 		getRelativePaths: vi.fn(async () => ({ paths: [] })),
 		openImage: vi.fn(async () => ({})),
 		openFile: vi.fn(async () => ({})),
+		refreshSkills: vi.fn(async () => ({ globalSkills: [], localSkills: [] })),
 	},
 	StateServiceClient: {
 		togglePlanActModeProto: vi.fn(async () => ({})),

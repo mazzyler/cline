@@ -1,4 +1,5 @@
 import type { McpServer } from "@shared/mcp"
+import { SkillInfo } from "@shared/proto/cline/file"
 import { describe, expect, it } from "vitest"
 import {
 	getMatchingSlashCommands,
@@ -254,6 +255,36 @@ describe("slash-commands", () => {
 		it("should return null for non-matching MCP command", () => {
 			const result = validateSlashCommand("mcp:unknown:cmd", {}, {}, undefined, undefined, mcpServers)
 			expect(result).toBe(null)
+		})
+	})
+
+	describe("getMatchingSlashCommands with skills", () => {
+		const skills = [
+			SkillInfo.create({ name: "retro", description: "Retrospective on a coding session", enabled: true }),
+			SkillInfo.create({ name: "tdd", description: "", enabled: true }),
+			SkillInfo.create({ name: "disabled-skill", description: "Toggled off", enabled: false }),
+		]
+
+		it("lists enabled skills as their own section", () => {
+			const result = getMatchingSlashCommands("", {}, {}, undefined, undefined, [], skills)
+			const skillCommands = result.filter((cmd) => cmd.section === "skills")
+
+			expect(skillCommands).toEqual([
+				{ name: "retro", description: "Retrospective on a coding session", section: "skills" },
+				{ name: "tdd", description: "", section: "skills" },
+			])
+		})
+
+		it("filters skills by the typed query", () => {
+			const result = getMatchingSlashCommands("ret", {}, {}, undefined, undefined, [], skills)
+
+			expect(result.map((cmd) => cmd.name)).toEqual(["retro"])
+		})
+
+		it("validates a skill command as full and a prefix as partial", () => {
+			expect(validateSlashCommand("retro", {}, {}, undefined, undefined, [], skills)).toBe("full")
+			expect(validateSlashCommand("ret", {}, {}, undefined, undefined, [], skills)).toBe("partial")
+			expect(validateSlashCommand("disabled-skill", {}, {}, undefined, undefined, [], skills)).toBe(null)
 		})
 	})
 

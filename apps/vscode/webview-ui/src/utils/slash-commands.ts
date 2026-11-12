@@ -1,4 +1,5 @@
 import type { McpServer } from "@shared/mcp"
+import type { SkillInfo } from "@shared/proto/cline/file"
 import { PLATFORM_CONFIG, PlatformType } from "@/config/platform.config"
 import { BASE_SLASH_COMMANDS, type SlashCommand, VSCODE_ONLY_COMMANDS } from "../../../src/shared/slashCommands.ts"
 
@@ -94,6 +95,22 @@ export function getMcpPromptCommands(mcpServers: McpServer[] = []): SlashCommand
 	return commands
 }
 
+/**
+ * Gets enabled skill commands. Skills are discovered from the agent skill
+ * directories (`~/.agents/skills`, `~/.cline/skills`, workspace equivalents)
+ * and served by the `skills` tool; surfacing them here lets the chat input
+ * autocomplete and expand `/skill-name` like the Cline CLI does.
+ */
+export function getSkillCommands(skills: SkillInfo[] = []): SlashCommand[] {
+	return skills
+		.filter((skill) => skill.enabled !== false)
+		.map((skill) => ({
+			name: skill.name,
+			description: skill.description,
+			section: "skills",
+		}))
+}
+
 // Regex for detecting slash commands in text
 // Must be at start of string OR preceded by whitespace to avoid matching URLs/paths
 // e.g., matches "/newtask" or "text /newtask" but not "http://example.com/newtask"
@@ -181,6 +198,7 @@ export function getMatchingSlashCommands(
 	remoteWorkflowToggles?: Record<string, boolean>,
 	remoteWorkflows?: any[],
 	mcpServers: McpServer[] = [],
+	skills: SkillInfo[] = [],
 ): SlashCommand[] {
 	const workflowCommands = getWorkflowCommands(
 		localWorkflowToggles,
@@ -189,7 +207,8 @@ export function getMatchingSlashCommands(
 		remoteWorkflows,
 	)
 	const mcpPromptCommands = getMcpPromptCommands(mcpServers)
-	const allCommands = [...DEFAULT_SLASH_COMMANDS, ...workflowCommands, ...mcpPromptCommands]
+	const skillCommands = getSkillCommands(skills)
+	const allCommands = [...DEFAULT_SLASH_COMMANDS, ...workflowCommands, ...skillCommands, ...mcpPromptCommands]
 
 	if (!query) {
 		return allCommands
@@ -233,6 +252,7 @@ export function validateSlashCommand(
 	remoteWorkflowToggles?: Record<string, boolean>,
 	remoteWorkflows?: any[],
 	mcpServers: McpServer[] = [],
+	skills: SkillInfo[] = [],
 ): "full" | "partial" | null {
 	if (!command) {
 		return null
@@ -245,7 +265,8 @@ export function validateSlashCommand(
 		remoteWorkflows,
 	)
 	const mcpPromptCommands = getMcpPromptCommands(mcpServers)
-	const allCommands = [...DEFAULT_SLASH_COMMANDS, ...workflowCommands, ...mcpPromptCommands]
+	const skillCommands = getSkillCommands(skills)
+	const allCommands = [...DEFAULT_SLASH_COMMANDS, ...workflowCommands, ...skillCommands, ...mcpPromptCommands]
 
 	// case insensitive matching
 	const exactMatch = allCommands.some((cmd) => cmd.name.toLowerCase() === command.toLowerCase())

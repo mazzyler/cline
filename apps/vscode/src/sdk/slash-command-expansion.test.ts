@@ -78,6 +78,16 @@ describe("expandSlashCommands", () => {
 		expect(expandSlashCommands("/debug this failure", commands)).toBe("/debug this failure")
 	})
 
+	it("expands configured skills when expandSkills is on (CLI parity)", () => {
+		expect(expandSlashCommands("/debug this failure", commands, { expandSkills: true })).toBe(
+			"Use the debugging skill. this failure",
+		)
+		// Workflow toggles never apply to skills, even when they expand.
+		expect(expandSlashCommands("/debug", commands, { expandSkills: true, disabledWorkflowNames: new Set(["debug"]) })).toBe(
+			"Use the debugging skill.",
+		)
+	})
+
 	it("still expands builtin pseudo-skills, which the skills tool does not serve", () => {
 		const builtin: AvailableRuntimeCommand = {
 			id: "builtin:deep-planning",

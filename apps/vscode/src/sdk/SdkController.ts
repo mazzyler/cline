@@ -1166,6 +1166,8 @@ export class Controller {
 			return expandSlashCommands(text, [...service.listRuntimeCommands(), ...BUILTIN_SLASH_COMMANDS], {
 				disabledWorkflowNames,
 				workflowRecords,
+				// Match the CLI: `/skill` expands into the SKILL.md instructions.
+				expandSkills: true,
 			})
 		} catch (error) {
 			Logger.warn("[SdkController] Slash command resolution failed, using raw text:", error)

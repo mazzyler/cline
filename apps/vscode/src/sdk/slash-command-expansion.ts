@@ -102,6 +102,14 @@ export interface ExpandSlashCommandsOptions {
 	 * whose frontmatter `name` differs from its filename.
 	 */
 	workflowRecords?: ReadonlyArray<WorkflowRecordRef>
+	/**
+	 * Expand configured skills (kind "skill") into their SKILL.md instructions.
+	 * Off by default: the SDK runtime serves skills through the `skills` tool,
+	 * which the model is required to call when the user references a slash
+	 * command. The VS Code extension turns this on to match the CLI, which
+	 * expands `/skill` inline.
+	 */
+	expandSkills?: boolean
 }
 
 /**
@@ -188,14 +196,16 @@ export function expandSlashCommands(
 				continue
 			}
 		}
-		// Configured skills are not expanded into the prompt: the SDK session
-		// registers the `skills` tool, whose description requires the model to
-		// invoke it when the user references a slash command, so the
-		// instructions arrive as a tool result and the transcript keeps the
-		// typed command. Builtins (e.g. /deep-planning) are declared as kind
-		// "skill" but are not served by that tool, so they keep expanding —
-		// as do workflows.
-		if (command.kind === "skill" && !command.id.startsWith("builtin:")) {
+		// Configured skills are expanded only when the caller opts in via
+		// `expandSkills`. By default the SDK session serves them through the
+		// `skills` tool, whose description requires the model to invoke it when
+		// the user references a slash command, so the instructions arrive as a
+		// tool result and the transcript keeps the typed command. The VS Code
+		// extension opts in to match the CLI, which expands `/skill` inline.
+		// Builtins (e.g. /deep-planning) are declared as kind "skill" but are not
+		// served by that tool, so they keep expanding — as do workflows.
+		const isBuiltinSkill = command.kind === "skill" && command.id.startsWith("builtin:")
+		if (command.kind === "skill" && !isBuiltinSkill && !options.expandSkills) {
 			continue
 		}
 		const start = (match.index ?? 0) + match[1].length
