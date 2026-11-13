@@ -26,14 +26,20 @@ export const PROCESS_HOT_TIMEOUT_COMPILING = 15_000
 // falling back to prompt-heuristic completion. Once the CommandExecuted (C)
 // marker is seen, shell integration is trusted and these do not apply.
 
-/** How long to wait for the first data before checking for markerless completion (10 seconds) */
-export const MARKERLESS_FIRST_DATA_TIMEOUT = 10_000
+// The fallback is a recovery path, not the steady state: when the shell
+// integration marker is lost the command has already finished, and the long
+// upstream windows only add latency to every such call (measured 20-33s per
+// tool call). Keep the windows short; the result still carries the "exit code
+// unknown" caveat, so this only caps the wait.
 
-/** Idle gap between data chunks that triggers a prompt-heuristic check (3 seconds) */
-export const MARKERLESS_IDLE_TIMEOUT = 3_000
+/** How long to wait for the first data before checking for markerless completion (0.8 seconds) */
+export const MARKERLESS_FIRST_DATA_TIMEOUT = 800
 
-/** Quiet time after which a markerless command is considered done even without a prompt (30 seconds) */
-export const MARKERLESS_MAX_QUIET_TIME = 30_000
+/** Idle gap between data chunks that triggers a prompt-heuristic check (0.4 seconds) */
+export const MARKERLESS_IDLE_TIMEOUT = 400
+
+/** Quiet time after which a markerless command is considered done even without a prompt (2 seconds) */
+export const MARKERLESS_MAX_QUIET_TIME = 2_000
 
 // =============================================================================
 // Exit Code Event Race
@@ -43,8 +49,8 @@ export const MARKERLESS_MAX_QUIET_TIME = 30_000
 // with a bounded race so a command whose shell integration never reports
 // completion (e.g. no OSC 633 markers at all) doesn't hang indefinitely.
 
-/** How long to wait for onDidEndTerminalShellExecution after the stream ends (3 seconds) */
-export const EXIT_CODE_EVENT_TIMEOUT_MS = 3_000
+/** How long to wait for onDidEndTerminalShellExecution after the stream ends (1 second) */
+export const EXIT_CODE_EVENT_TIMEOUT_MS = 1_000
 
 // =============================================================================
 // Large Output Protection
