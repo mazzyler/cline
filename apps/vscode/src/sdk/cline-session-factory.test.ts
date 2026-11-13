@@ -1743,6 +1743,40 @@ describe("buildSessionConfig", () => {
 		})
 		expect(config.systemPrompt).toContain("# Plan / Act Modes")
 	})
+
+	it("enables the shared SDK spawn_agent tool when subagents are on", async () => {
+		mocks.stateManager.getGlobalSettingsKey.mockImplementation((key: string) => {
+			if (key === "subagentsEnabled") {
+				return true
+			}
+			return undefined
+		})
+
+		const config = await buildSessionConfig({ cwd: "/tmp/workspace" })
+
+		expect(config.enableSpawnAgent).toBe(true)
+	})
+
+	it("disables spawn_agent when the subagents setting is off", async () => {
+		mocks.stateManager.getGlobalSettingsKey.mockImplementation((key: string) => {
+			if (key === "subagentsEnabled") {
+				return false
+			}
+			return undefined
+		})
+
+		const config = await buildSessionConfig({ cwd: "/tmp/workspace" })
+
+		expect(config.enableSpawnAgent).toBe(false)
+	})
+
+	it("keeps subagents on when the setting is missing", async () => {
+		mocks.stateManager.getGlobalSettingsKey.mockImplementation(() => undefined)
+
+		const config = await buildSessionConfig({ cwd: "/tmp/workspace" })
+
+		expect(config.enableSpawnAgent).toBe(true)
+	})
 })
 
 // ---------------------------------------------------------------------------

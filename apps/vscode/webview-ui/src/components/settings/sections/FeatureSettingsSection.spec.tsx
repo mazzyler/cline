@@ -76,6 +76,26 @@ describe("FeatureSettingsSection", () => {
 		expect(strategySelect).toHaveAttribute("disabled")
 	})
 
+	it("renders the Subagents toggle in the Agent section", () => {
+		const { container } = render(<FeatureSettingsSection renderSectionHeader={() => null} />)
+
+		expect(screen.getByText("Subagents")).toBeTruthy()
+
+		const agentSection = container.querySelector("#agent-features")
+		const editorSection = container.querySelector("#optional-features")
+
+		expect(agentSection?.querySelector("#subagents-setting-control")).toBeTruthy()
+		expect(editorSection?.querySelector("#subagents-setting-control")).toBeNull()
+	})
+
+	it("calls updateSetting with subagentsEnabled when toggled", () => {
+		render(<FeatureSettingsSection renderSectionHeader={() => null} />)
+
+		fireEvent.click(screen.getByRole("switch", { name: "Subagents" }))
+
+		expect(mockUpdateSetting).toHaveBeenCalledWith("subagentsEnabled", true)
+	})
+
 	it("calls updateSetting with hooksEnabled when toggled", () => {
 		render(<FeatureSettingsSection renderSectionHeader={() => null} />)
 

@@ -1085,6 +1085,10 @@ export async function buildSessionConfig(input: SessionConfigInput): Promise<Cor
 	const compactionStrategy = readCompactionStrategyGlobally()
 	const enableCheckpoints = stateManager.getGlobalSettingsKey("enableCheckpointsSetting") ?? true
 	const useAutoCondense = input.taskSettings?.useAutoCondense ?? globalUseAutoCondense
+	// Sub-agents run through the shared SDK tool (spawn_agent). Upstream pinned
+	// the switch off for the VS Code extension while the SDK runtime stabilized;
+	// the setting defaults to on and can be turned off in Settings.
+	const subagentsEnabled = stateManager.getGlobalSettingsKey("subagentsEnabled") ?? true
 
 	// Core resolves providers against the SDK registry, which uses the SDK's
 	// own provider id spelling (e.g. "openai-compatible" rather than the
@@ -1157,7 +1161,7 @@ export async function buildSessionConfig(input: SessionConfigInput): Promise<Cor
 		checkpoint: {
 			enabled: enableCheckpoints,
 		},
-		enableSpawnAgent: false,
+		enableSpawnAgent: subagentsEnabled,
 		enableAgentTeams: false,
 		...(useAutoCondense
 			? {

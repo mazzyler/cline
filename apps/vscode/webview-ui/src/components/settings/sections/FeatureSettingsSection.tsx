@@ -39,6 +39,13 @@ const agentFeatures: FeatureToggle[] = [
 		stateKey: "useAutoCondense",
 		settingKey: "useAutoCondense",
 	},
+	{
+		id: "subagents",
+		label: "Subagents",
+		description: "Let Cline delegate focused work to parallel sub-agents with their own context windows.",
+		stateKey: "subagentsEnabled",
+		settingKey: "subagentsEnabled",
+	},
 ]
 
 const editorFeatures: FeatureToggle[] = [

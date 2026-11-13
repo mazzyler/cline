@@ -281,7 +281,7 @@ const USER_SETTINGS_FIELDS = {
 	defaultTerminalProfile: { default: "default" as string },
 	hooksEnabled: { default: true as boolean },
 	useAutoCondense: { default: true as boolean },
-	subagentsEnabled: { default: false as boolean },
+	subagentsEnabled: { default: true as boolean },
 	worktreesEnabled: { default: false as boolean },
 	cloudSessionsEnabled: { default: false as boolean },
 	preferredLanguage: { default: "English" as string },
