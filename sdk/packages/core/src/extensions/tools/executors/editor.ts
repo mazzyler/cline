@@ -191,14 +191,14 @@ async function replaceInFile(
 		if (result.candidates.length === 0) {
 			throw new Error(
 				`No replacement performed: text not found in ${filePath}.` +
-					formatEditorHint(content, normalizedOldStr, eol),
+					formatEditorHint(content, normalizedOldStr),
 			);
 		}
 		throw new Error(
 			`No replacement performed: multiple occurrences of text found in ${filePath} (` +
 				`${result.candidates.length}, ${result.mode}).` +
 				formatEditorOccurrenceLines(content, normalizedOldStr) +
-				`\n${formatEditorCandidates(content, eol, result)}` +
+				`\n${formatEditorCandidates(content, result)}` +
 				`\n Pass \`occurrence: N\` (1-${result.candidates.length}) to replace one of them, ` +
 				`or extend old_text with the context lines above.`,
 		);

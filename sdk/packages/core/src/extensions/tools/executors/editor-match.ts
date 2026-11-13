@@ -32,8 +32,10 @@ export interface EditorMatchResult {
 	mode: EditorMatchMode;
 }
 
-function splitLines(content: string, eol: "\r\n" | "\n"): string[] {
-	return content.split(eol === "\r\n" ? /\r\n/ : /\n/);
+function splitLines(content: string): string[] {
+	// Split on both endings, like the file reader that produced the content:
+	// a CRLF file can still contain lone LFs, and a window must not span them.
+	return content.split(/\r\n|\n/);
 }
 
 function lineStarts(content: string, eol: "\r\n" | "\n"): number[] {
@@ -93,11 +95,11 @@ export function findEditorMatches(
 		return { candidates: exact, mode: "exact" };
 	}
 
-	const oldLines = splitLines(oldText, eol);
+	const oldLines = splitLines(oldText);
 	if (oldLines.length === 0) {
 		return { candidates: [], mode: "exact" };
 	}
-	const fileLines = splitLines(content, eol);
+	const fileLines = splitLines(content);
 	const starts = lineStarts(content, eol);
 
 	for (let modeIndex = 0; modeIndex < MODES.length; modeIndex++) {
@@ -137,13 +139,12 @@ export function findEditorMatches(
 /** Three lines of context around each candidate, for the multiple-match error. */
 export function formatEditorCandidates(
 	content: string,
-	eol: "\r\n" | "\n",
 	result: EditorMatchResult,
 ): string {
 	if (result.candidates.length === 0) {
 		return "";
 	}
-	const fileLines = splitLines(content, eol);
+	const fileLines = splitLines(content);
 	const out: string[] = [];
 	for (const [index, candidate] of result.candidates.slice(0, 5).entries()) {
 		const first = lineNumberAt(content, candidate.offset);
@@ -203,13 +204,9 @@ export function formatEditorOccurrenceLines(
  * first non-empty line of old_text. Words shorter than four characters are
  * ignored, so punctuation and short identifiers do not produce noise.
  */
-export function formatEditorHint(
-	content: string,
-	oldText: string,
-	eol: "\r\n" | "\n",
-): string {
-	const oldLines = splitLines(oldText, eol);
-	const fileLines = splitLines(content, eol);
+export function formatEditorHint(content: string, oldText: string): string {
+	const oldLines = splitLines(oldText);
+	const fileLines = splitLines(content);
 	let best = -1;
 	let bestScore = 0;
 	let first = "";
