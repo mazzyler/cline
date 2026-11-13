@@ -1063,6 +1063,9 @@ export class Controller {
 		}
 		await this.setRemoteConfigCoreIntegration(undefined)
 		this.isDisposed = true
+		// Drop any pending abort cleanup/timer before the session it would resume
+		// is torn down.
+		this.languageGuard.dispose()
 		// Tear down the debounced state-post machinery before downstream resources
 		// are disposed below — see StatePostDebouncer.dispose().
 		await this.statePostDebouncer.dispose()
