@@ -64,6 +64,7 @@ import { ClineAccountService } from "./account-service"
 import { AuthService, LogoutReason } from "./auth-service"
 import { BUILTIN_SLASH_COMMANDS } from "./builtin-slash-commands"
 import { buildStartSessionInput, createHistoryItemFromSession } from "./cline-session-factory"
+import { SdkLanguageGuard } from "./language-guard"
 import { MessageTranslatorState, reshapeErrorForWebview } from "./message-translator"
 import { createProviderCatalog } from "./model-catalog/catalog"
 import type { Disposable, ProviderCatalog, ProviderConfigChange, ProviderConfigStore } from "./model-catalog/contracts"
@@ -221,6 +222,7 @@ export class Controller {
 	private taskControl: SdkTaskControlCoordinator
 	private taskStart: SdkTaskStartCoordinator
 	private compaction: SdkCompactionCoordinator
+	private languageGuard: SdkLanguageGuard
 	private sessionEvents: SdkSessionEventCoordinator
 	private cloud!: SdkCloudSessionCoordinator
 	readonly cloudSessions: CloudSessionsService
@@ -461,7 +463,10 @@ export class Controller {
 			// this.mode is assigned later in this constructor; the closure only
 			// runs at send time, long after construction completes.
 			consumeModeSwitchNotice: (sessionId) => this.mode.consumeModeSwitchNotice(sessionId),
-			onSendComplete: async () => {
+			onSendComplete: async (sessionId) => {
+				// Applies a pending language-guard cleanup before the turn's final
+				// state is posted, so the webview never keeps the aborted answer.
+				await this.languageGuard.onSendSettled(sessionId)
 				// Normal flows close their diff sessions inline; anything left here is orphaned.
 				void this.diffEdits.discardAllPreviews("turn complete")
 
@@ -521,6 +526,11 @@ export class Controller {
 					)
 				}
 				this.postStateToWebview().catch(() => {})
+			},
+			onSendAborted: (sessionId) => {
+				// The lifecycle returns before onSendError for expected abort
+				// errors; the guard still needs to finish its cleanup.
+				void this.languageGuard.onSendSettled(sessionId)
 			},
 		})
 		this.sessionRebuilds = new SdkSessionRebuildScheduler({ sessions: this.sessions })
@@ -758,6 +768,15 @@ export class Controller {
 			getWorkspaceRoot: () => this.getWorkspaceRoot(),
 			postStateToWebview: () => this.postStateToWebview(),
 		})
+		this.languageGuard = new SdkLanguageGuard({
+			getActiveSession: () => this.sessions.getActiveSession(),
+			getTask: () => this.task,
+			setRunning: (running) => this.sessions.setRunning(running),
+			clearPending: (reason) => this.interactions.clearPending(reason),
+			postStateToWebview: () => this.postStateToWebview(),
+			bumpEpoch: () => this.messageTranslatorState.getMinter().bumpEpoch(),
+			resume: (prompt) => this.resumeAfterLanguageGuard(prompt),
+		})
 		this.sessionEvents = new SdkSessionEventCoordinator({
 			messageTranslatorState: this.messageTranslatorState,
 			sessions: this.sessions,
@@ -770,6 +789,7 @@ export class Controller {
 			getTurnPhase: () => this.turnStateTracker.currentPhase,
 			captureProviderApiError: (event) => this.captureProviderFailure(event),
 			beginProviderFailureTelemetryTurn: () => this.beginProviderFailureTelemetryTurn(),
+			languageGuard: this.languageGuard,
 		})
 		// Subscribe to MCP tool list changes so we can restart the SDK session
 		// when servers are added/removed/reconnected. The SDK's DefaultSessionBuilder
@@ -2593,6 +2613,30 @@ export class Controller {
 	resetMessageTranslatorAndFence(): void {
 		this.messageTranslatorState.reset()
 		this.messageTranslatorState.getMinter().bumpEpoch()
+	}
+
+	/**
+	 * Sends a synthetic, model-facing prompt after the language guard aborted a
+	 * turn.
+	 *
+	 * This bypasses the askResponse router on purpose: the router chooses
+	 * between queueing and resuming from the turn phase, and a just-aborted
+	 * turn can still look active. The phase is set explicitly, the prompt is
+	 * hidden from the transcript by isSyntheticUserPrompt (its synthetic
+	 * prefix), and fireAndForgetSend keeps the echo out of the chat.
+	 */
+	async resumeAfterLanguageGuard(prompt: string): Promise<void> {
+		const activeSession = this.sessions.getActiveSession()
+		if (!activeSession) {
+			Logger.warn("[SdkController] Language guard: no active session to resume")
+			return
+		}
+		this.resetMessageTranslatorAndFence()
+		this.turnStateTracker.set("streaming")
+		this.messageTranslatorState.clearTurnOutcome()
+		this.sessions.setRunning(true)
+		this.sessions.fireAndForgetSend(activeSession.sdkHost, activeSession.sessionId, prompt)
+		await this.postStateToWebview()
 	}
 
 	async getStateToPostToWebview(snapshotAttempt = 0): Promise<ExtensionState> {

@@ -49,6 +49,12 @@ export interface SdkSessionLifecycleOptions {
 	onSendComplete: (sessionId: string) => Promise<void> | void
 	onSendError: (error: unknown, sessionId: string) => Promise<void> | void
 	/**
+	 * Called when a send settles with an expected AbortError. The abort branch
+	 * returns before onSendError, so consumers that react to every settled turn
+	 * (the language guard) need this separate hook.
+	 */
+	onSendAborted?: (sessionId: string) => void
+	/**
 	 * Returns (and clears) a pending user-initiated plan/act switch recorded by
 	 * SdkModeCoordinator for this session, so fireAndForgetSend — the single
 	 * funnel for outbound turn sends — can stamp a <mode_notice> onto the next
@@ -568,6 +574,7 @@ export class SdkSessionLifecycle {
 		}).catch(async (error: unknown) => {
 			if (isAbortError(error)) {
 				Logger.debug(`[SdkController] Agent turn aborted (expected): ${sessionId}`)
+				this.options.onSendAborted?.(sessionId)
 				return
 			}
 			if (isSuperseded("failure")) {

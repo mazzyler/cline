@@ -5,6 +5,7 @@ import { CLINE_RECOMMENDED_MODELS_FALLBACK } from "@/shared/cline/recommended-mo
 import type { ClineApiReqInfo, TurnPhase } from "@/shared/ExtensionMessage"
 import { Logger } from "@/shared/services/Logger"
 import { isClineManagedProvider } from "@/shared/utils/cline"
+import type { SdkLanguageGuard } from "./language-guard"
 import type { MessageTranslatorState, TranslationResult } from "./message-translator"
 import { translateSessionEvent } from "./message-translator"
 import { PROVIDER_FAILURE_ERROR_TYPE, PROVIDER_FAILURE_PHASE, type ProviderFailureTelemetry } from "./provider-failure-telemetry"
@@ -39,6 +40,11 @@ export interface SdkSessionEventCoordinatorOptions {
 	getTurnPhase?: () => TurnPhase
 	captureProviderApiError?: (event: ProviderFailureTelemetry) => void
 	beginProviderFailureTelemetryTurn?: () => void
+	/**
+	 * Called for every lead-agent event before translation. The language guard
+	 * watches text deltas here; translation itself must not see the abort.
+	 */
+	languageGuard?: SdkLanguageGuard
 }
 
 export class SdkSessionEventCoordinator {
@@ -57,6 +63,14 @@ export class SdkSessionEventCoordinator {
 				`[SdkController] Ignoring stale SDK event for session ${event.payload.sessionId}; active=${activeSession?.sessionId ?? "none"}`,
 			)
 			return
+		}
+
+		if (event.type === "agent_event") {
+			try {
+				this.options.languageGuard?.observe(event.payload.sessionId, event.payload.event)
+			} catch (error) {
+				Logger.error("[SdkController] Language guard failed:", error)
+			}
 		}
 
 		if (event.type === "pending_prompts") {
