@@ -1,3 +1,4 @@
+import type { HistoryItem } from "@shared/HistoryItem"
 import { StringRequest } from "@shared/proto/cline/common"
 import { memo, useMemo } from "react"
 import { CloudStatusPill } from "@/components/cloud/CloudStatusPill"
@@ -10,9 +11,19 @@ type HistoryPreviewProps = {
 	showHistoryView: () => void
 }
 
+/**
+ * The Recent section is a shortcut, not the history view: seven rows keep the
+ * last tasks within reach without pushing the rest of the home screen down.
+ */
+export const HISTORY_PREVIEW_LIMIT = 7
+
+export function selectHistoryPreviewItems(taskHistory: HistoryItem[]): HistoryItem[] {
+	return taskHistory.filter((item) => item.ts && item.task).slice(0, HISTORY_PREVIEW_LIMIT)
+}
+
 const HistoryPreview = ({ showHistoryView }: HistoryPreviewProps) => {
 	const { taskHistory } = useExtensionState()
-	const previewItems = useMemo(() => taskHistory.filter((item) => item.ts && item.task).slice(0, 3), [taskHistory])
+	const previewItems = useMemo(() => selectHistoryPreviewItems(taskHistory), [taskHistory])
 	const resolvedCloudStatuses = useResolvedCloudStatuses(previewItems)
 	const isCostVisible = useUsageCostVisibility()
 	const handleHistorySelect = (id: string) => {
