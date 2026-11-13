@@ -148,6 +148,17 @@ export {
 } from "../../../../sdk/packages/core/src/extensions/tools/executors/apply-patch"
 export { PATCH_MARKERS, PatchActionType } from "../../../../sdk/packages/core/src/extensions/tools/executors/apply-patch-parser"
 export { createEditorExecutor } from "../../../../sdk/packages/core/src/extensions/tools/executors/editor"
+export {
+	type EditorMatch,
+	type EditorMatchMode,
+	type EditorMatchResult,
+	findEditorMatches,
+	formatEditorCandidates,
+	formatEditorHint,
+	formatEditorMatchNote,
+	formatEditorOccurrenceLines,
+	lineNumberAt,
+} from "../../../../sdk/packages/core/src/extensions/tools/executors/editor-match"
 export type { EditFileInput } from "../../../../sdk/packages/core/src/extensions/tools/schemas"
 export type { ApplyPatchExecutor, EditorExecutor, ToolExecutors } from "../../../../sdk/packages/core/src/extensions/tools/types"
 // Real rule selection re-exported from SDK source so standalone callers are

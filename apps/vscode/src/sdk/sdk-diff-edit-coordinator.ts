@@ -6,6 +6,7 @@ import {
 	createEditorExecutor,
 	type EditFileInput,
 	type EditorExecutor,
+	findEditorMatches,
 	PatchActionType,
 } from "@cline/core"
 import type { AgentToolContext } from "@cline/shared"
@@ -418,15 +419,26 @@ export function computeNewEditorContent(
 	const eol = detectLineEnding(originalContent)
 	const normalizedOldText = normalizeLineEndings(input.old_text, eol)
 	const normalizedNewText = normalizeLineEndings(input.new_text ?? "", eol)
-	const occurrences = normalizedOldText.length === 0 ? 0 : originalContent.split(normalizedOldText).length - 1
-	if (occurrences === 0) {
-		throw new Error(`No replacement performed: text not found in ${filePath}.`)
-	}
-	if (occurrences > 1) {
+	const matches = findEditorMatches(originalContent, normalizedOldText, eol)
+	const occurrence = input.occurrence ?? undefined
+	const selected =
+		matches.candidates.length === 1
+			? matches.candidates[0]
+			: occurrence !== undefined && occurrence >= 1 && occurrence <= matches.candidates.length
+				? matches.candidates[occurrence - 1]
+				: undefined
+	if (!selected) {
+		if (matches.candidates.length === 0) {
+			throw new Error(`No replacement performed: text not found in ${filePath}.`)
+		}
+		// The executor returns the candidate list and the occurrence hint; the
+		// preview only needs to know that this input cannot be shown.
 		throw new Error(`No replacement performed: multiple occurrences of text found in ${filePath}.`)
 	}
-	// Replacer function so "$"-sequences in new_text are inserted literally, as the executor does.
-	return originalContent.replace(normalizedOldText, () => normalizedNewText)
+	// Replace by offset so "$"-sequences in new_text stay literal, as the executor does.
+	return (
+		originalContent.slice(0, selected.offset) + normalizedNewText + originalContent.slice(selected.offset + selected.length)
+	)
 }
 
 /** Mirrors the SDK executor's resolveFilePath (restrictToCwd=true): absolute paths pass through. */

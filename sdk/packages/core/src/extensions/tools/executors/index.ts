@@ -40,6 +40,17 @@ export {
 } from "./bash";
 export { createEditorExecutor, type EditorExecutorOptions } from "./editor";
 export {
+	type EditorMatch,
+	type EditorMatchMode,
+	type EditorMatchResult,
+	findEditorMatches,
+	formatEditorCandidates,
+	formatEditorHint,
+	formatEditorMatchNote,
+	formatEditorOccurrenceLines,
+	lineNumberAt,
+} from "./editor-match";
+export {
 	createFileReadExecutor,
 	type FileReadExecutorOptions,
 } from "./file-read";

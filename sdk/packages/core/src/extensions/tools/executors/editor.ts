@@ -10,6 +10,14 @@ import type { AgentToolContext } from "@cline/shared";
 import type { EditFileInput } from "../schemas";
 import type { EditorExecutor } from "../types";
 import {
+	type EditorMatch,
+	findEditorMatches,
+	formatEditorCandidates,
+	formatEditorHint,
+	formatEditorMatchNote,
+	formatEditorOccurrenceLines,
+} from "./editor-match";
+import {
 	detectLineEnding,
 	normalizeLineEndings,
 	normalizeNewFileLineEndings,
@@ -62,11 +70,6 @@ function resolveFilePath(
 		throw new Error(`Path must stay within cwd: ${inputPath}`);
 	}
 	return resolved;
-}
-
-function countOccurrences(content: string, needle: string): number {
-	if (needle.length === 0) return 0;
-	return content.split(needle).length - 1;
 }
 
 // Reads produced via readline strip "\r", so models emit LF-only text even
@@ -163,6 +166,7 @@ async function replaceInFile(
 	filePath: string,
 	oldStr: string,
 	newStr: string | null | undefined,
+	occurrence: number | undefined,
 	encoding: BufferEncoding,
 	maxDiffLines: number,
 ): Promise<string> {
@@ -170,25 +174,48 @@ async function replaceInFile(
 	const eol = detectLineEnding(content);
 	const normalizedOldStr = normalizeLineEndings(oldStr, eol);
 	const normalizedNewStr = normalizeLineEndings(newStr ?? "", eol);
-	const occurrences = countOccurrences(content, normalizedOldStr);
+	const result = findEditorMatches(content, normalizedOldStr, eol);
 
-	if (occurrences === 0) {
-		throw new Error(`No replacement performed: text not found in ${filePath}.`);
+	let selected: EditorMatch | undefined;
+	if (result.candidates.length === 1) {
+		selected = result.candidates[0];
+	} else if (
+		occurrence !== undefined &&
+		occurrence >= 1 &&
+		occurrence <= result.candidates.length
+	) {
+		selected = result.candidates[occurrence - 1];
 	}
 
-	if (occurrences > 1) {
+	if (!selected) {
+		if (result.candidates.length === 0) {
+			throw new Error(
+				`No replacement performed: text not found in ${filePath}.` +
+					formatEditorHint(content, normalizedOldStr, eol),
+			);
+		}
 		throw new Error(
-			`No replacement performed: multiple occurrences of text found in ${filePath}.`,
+			`No replacement performed: multiple occurrences of text found in ${filePath} (` +
+				`${result.candidates.length}, ${result.mode}).` +
+				formatEditorOccurrenceLines(content, normalizedOldStr) +
+				`\n${formatEditorCandidates(content, eol, result)}` +
+				`\n Pass \`occurrence: N\` (1-${result.candidates.length}) to replace one of them, ` +
+				`or extend old_text with the context lines above.`,
 		);
 	}
 
-	// Replacer function so "$"-sequences in new_text ($&, $', $`, $$, $n)
-	// are inserted literally instead of being expanded by String.replace.
-	const updated = content.replace(normalizedOldStr, () => normalizedNewStr);
+	// Replace by offset: unlike String.replace, this cannot expand "$"
+	// sequences in new_text and never substitutes a different occurrence than
+	// the one selected above.
+	const updated =
+		content.slice(0, selected.offset) +
+		normalizedNewStr +
+		content.slice(selected.offset + selected.length);
 	await fs.writeFile(filePath, updated, { encoding });
 
+	const note = formatEditorMatchNote(content, result, selected, occurrence);
 	const diff = createLineDiff(content, updated, maxDiffLines);
-	return `Edited ${filePath}\n${diff}`;
+	return `Edited ${filePath}${note}\n${diff}`;
 }
 
 async function insertInFile(
@@ -261,6 +288,7 @@ export function createEditorExecutor(
 			filePath,
 			input.old_text,
 			input.new_text,
+			input.occurrence ?? undefined,
 			encoding,
 			maxDiffLines,
 		);

@@ -102,6 +102,18 @@ describe("computeNewEditorContent", () => {
 		)
 	})
 
+	it("previews the occurrence picked from an ambiguous match", () => {
+		const input: EditFileInput = { path: filePath, old_text: "a", new_text: "x", occurrence: 2 }
+		expect(computeNewEditorContent("a\na", input, filePath, "modify")).toBe("a\nx")
+	})
+
+	it("previews a whitespace-tolerant fallback the same way the executor applies it", () => {
+		const input: EditFileInput = { path: filePath, old_text: "    return 1;", new_text: "  return 2;" }
+		expect(computeNewEditorContent("function f() {\n  return 1;\n}\n", input, filePath, "modify")).toBe(
+			"function f() {\n  return 2;\n}\n",
+		)
+	})
+
 	it("throws for missing old_text on an existing file", () => {
 		const input: EditFileInput = { path: filePath, new_text: "x" }
 		expect(() => computeNewEditorContent("a", input, filePath, "modify")).toThrow(

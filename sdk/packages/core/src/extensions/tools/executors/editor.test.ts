@@ -313,3 +313,113 @@ describe("createEditorExecutor", () => {
 		}
 	});
 });
+
+describe("whitespace-tolerant editor matching", () => {
+	it("applies an unambiguous indentation-only match and reports the fallback", async () => {
+		await withTempFile(
+			"function f() {\n  return 1;\n}\n",
+			async (filePath, dir) => {
+				const editor = createEditorExecutor();
+				const result = await editor(
+					{
+						path: filePath,
+						old_text: "    return 1;",
+						new_text: "  return 2;",
+					},
+					dir,
+					context,
+				);
+
+				expect(result).toContain(
+					"NOTE: old_text matched ignoring leading whitespace (indentation)",
+				);
+				await expect(fs.readFile(filePath, "utf-8")).resolves.toBe(
+					"function f() {\n  return 2;\n}\n",
+				);
+			},
+		);
+	});
+
+	it("ignores trailing whitespace on every line of a multi-line match", async () => {
+		await withTempFile("alpha  \nbeta\n", async (filePath, dir) => {
+			const editor = createEditorExecutor();
+			const result = await editor(
+				{ path: filePath, old_text: "alpha\nbeta", new_text: "ALPHA\nBETA" },
+				dir,
+				context,
+			);
+
+			expect(result).toContain(
+				"NOTE: old_text matched ignoring trailing whitespace",
+			);
+			await expect(fs.readFile(filePath, "utf-8")).resolves.toBe(
+				"ALPHA\nBETA\n",
+			);
+		});
+	});
+
+	it("keeps CRLF endings when the fallback matches line windows", async () => {
+		await withTempFile("a \r\nb\r\nc", async (filePath, dir) => {
+			const editor = createEditorExecutor();
+			await editor(
+				{ path: filePath, old_text: "a\nb", new_text: "A\nB" },
+				dir,
+				context,
+			);
+
+			await expect(fs.readFile(filePath, "utf-8")).resolves.toBe("A\r\nB\r\nc");
+		});
+	});
+
+	it("rejects an ambiguous exact match with candidate lines and the occurrence hint", async () => {
+		await withTempFile("x\nx\nx", async (filePath, dir) => {
+			const editor = createEditorExecutor();
+			await expect(
+				editor({ path: filePath, old_text: "x", new_text: "Y" }, dir, context),
+			).rejects.toThrow(/multiple occurrences of text found/);
+			await expect(
+				editor({ path: filePath, old_text: "x", new_text: "Y" }, dir, context),
+			).rejects.toThrow(/occurrence: N/);
+			await expect(
+				editor({ path: filePath, old_text: "x", new_text: "Y" }, dir, context),
+			).rejects.toThrow(/match 1\/3 -- lines 1-1 \(exact\)/);
+			await expect(fs.readFile(filePath, "utf-8")).resolves.toBe("x\nx\nx");
+		});
+	});
+
+	it("replaces the occurrence picked from the candidate list", async () => {
+		await withTempFile("x\nx\nx", async (filePath, dir) => {
+			const editor = createEditorExecutor();
+			const result = await editor(
+				{ path: filePath, old_text: "x", new_text: "Y", occurrence: 2 },
+				dir,
+				context,
+			);
+
+			expect(result).toContain("NOTE: replaced match 2 of 3");
+			await expect(fs.readFile(filePath, "utf-8")).resolves.toBe("x\nY\nx");
+		});
+	});
+
+	it("adds a closest-line hint when the text is absent", async () => {
+		await withTempFile("alpha beta gamma\n", async (filePath, dir) => {
+			const editor = createEditorExecutor();
+			await expect(
+				editor(
+					{ path: filePath, old_text: "alpha delta", new_text: "x" },
+					dir,
+					context,
+				),
+			).rejects.toThrow(/line closest to old_text is line 1/);
+		});
+	});
+
+	it("treats an empty old_text as not found", async () => {
+		await withTempFile("alpha\n", async (filePath, dir) => {
+			const editor = createEditorExecutor();
+			await expect(
+				editor({ path: filePath, old_text: "", new_text: "x" }, dir, context),
+			).rejects.toThrow(/text not found/);
+		});
+	});
+});

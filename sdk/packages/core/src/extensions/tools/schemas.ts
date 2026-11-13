@@ -211,12 +211,23 @@ export const EditFileInputSchema = z
 				z.string().optional(),
 			)
 			.describe(
-				`Exact text to replace (must match exactly once). Omit this when creating a missing file or inserting via insert_line. Keep this at or below ${INPUT_ARG_CHAR_LIMIT} characters when possible; larger payloads should be split across multiple tool calls to avoid timeouts.`,
+				`Text to replace. Matches exactly once; when the exact bytes are absent, a whitespace-tolerant fallback applies (leading/trailing spaces and indentation). When the text matches several places, the error lists the candidates with context and a retry may pass occurrence: N. Omit this when creating a missing file or inserting via insert_line. Keep this at or below ${INPUT_ARG_CHAR_LIMIT} characters when possible; larger payloads should be split across multiple tool calls to avoid timeouts.`,
 			),
 		new_text: z
 			.string()
 			.describe(
 				`The new content to write when creating a missing file, the replacement text for edits, or the inserted text when insert_line is provided. Keep this at or below ${INPUT_ARG_CHAR_LIMIT} characters when possible; for large edits, use multiple calls with small chunks of old_text and new_text to iteratively edit the file.`,
+			),
+		// One-based match number from the multiple-match candidate list. Only
+		// needed when old_text is deliberately ambiguous.
+		occurrence: z.coerce
+			.number()
+			.int()
+			.min(1)
+			.nullable()
+			.optional()
+			.describe(
+				"Optional one-based match number. Set it when old_text matches several places and the error lists candidates (match 1/N, 2/N, ...); otherwise the edit is rejected as ambiguous.",
 			),
 		// See start_line above: coerced so a stringified line number still applies.
 		insert_line: z.coerce
