@@ -174,7 +174,7 @@ async function replaceInFile(
 	const eol = detectLineEnding(content);
 	const normalizedOldStr = normalizeLineEndings(oldStr, eol);
 	const normalizedNewStr = normalizeLineEndings(newStr ?? "", eol);
-	const result = findEditorMatches(content, normalizedOldStr, eol);
+	const result = findEditorMatches(content, normalizedOldStr);
 
 	let selected: EditorMatch | undefined;
 	if (result.candidates.length === 1) {

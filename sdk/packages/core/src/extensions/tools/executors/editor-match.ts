@@ -38,16 +38,10 @@ function splitLines(content: string): string[] {
 	return content.split(/\r\n|\n/);
 }
 
-function lineStarts(content: string, eol: "\r\n" | "\n"): number[] {
+function lineStarts(content: string): number[] {
 	const starts = [0];
-	let from = 0;
-	while (from <= content.length) {
-		const next = content.indexOf(eol, from);
-		if (next < 0) {
-			break;
-		}
-		starts.push(next + eol.length);
-		from = next + eol.length;
+	for (const match of content.matchAll(/\r\n|\n/g)) {
+		starts.push((match.index ?? 0) + match[0].length);
 	}
 	return starts;
 }
@@ -75,7 +69,6 @@ export function lineNumberAt(content: string, offset: number): number {
 export function findEditorMatches(
 	content: string,
 	oldText: string,
-	eol: "\r\n" | "\n",
 ): EditorMatchResult {
 	if (oldText.length === 0) {
 		return { candidates: [], mode: "exact" };
@@ -100,7 +93,7 @@ export function findEditorMatches(
 		return { candidates: [], mode: "exact" };
 	}
 	const fileLines = splitLines(content);
-	const starts = lineStarts(content, eol);
+	const starts = lineStarts(content);
 
 	for (let modeIndex = 0; modeIndex < MODES.length; modeIndex++) {
 		const target = oldLines.map((line) => normalizeLine(line, modeIndex));
@@ -124,12 +117,17 @@ export function findEditorMatches(
 			continue;
 		}
 		const mode = MODES[modeIndex];
-		const candidates = hits.map((lineIndex) => ({
-			offset: starts[lineIndex] ?? content.length,
-			length: fileLines.slice(lineIndex, lineIndex + oldLines.length).join(eol)
-				.length,
-			mode,
-		}));
+		const candidates = hits.map((lineIndex) => {
+			const offset = starts[lineIndex] ?? content.length;
+			const nextStart = starts[lineIndex + oldLines.length];
+			// The window ends at the last matched line, so drop the line break
+			// that terminates it; a mixed-EOL file may use either form there.
+			const end =
+				nextStart === undefined
+					? content.length
+					: nextStart - (content[nextStart - 2] === "\r" ? 2 : 1);
+			return { offset, length: Math.max(0, end - offset), mode };
+		});
 		return { candidates, mode };
 	}
 
